@@ -70,4 +70,8 @@
     nbproject/build-impl.xml file. 
 
     -->
+    <!-- Fallback so plain `ant` works without the IDE; the IDE's own value always wins -->
+    <target name="-pre-init">
+        <property location="lib/CopyLibs/org-netbeans-modules-java-j2seproject-copylibstask.jar" name="libs.CopyLibs.classpath"/>
+    </target>
 </project>

@@ -11,6 +11,7 @@ import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 public class LogfileParser{
+    private static final String INIT_PATTERN = "\\[MidiLogIO\\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\] INIT - .*";
     private MidiLogIO io;
     private final File source;
     boolean running;
@@ -34,11 +35,16 @@ public class LogfileParser{
             files.clear();
             files.addAll(getLogFiles(source));
         }
+        //When starting up, there may be many INIT lines in the logs (one per world load).
+        //Only the most recent one is relevant: earlier sessions/worlds are gone,
+        //and processing all of them would reinitialize capabilities dozens of times.
+        String lastInit = null;
         for(File f : files){
             for(String line : Files.readAllLines(f.toPath())){
-                parseInit(line);
+                if(isInitLine(line))lastInit = line;
             }
         }
+        if(lastInit!=null)parseInit(lastInit);
         running = true;
         Thread listener = new Thread(() -> {
             File currentSource = source;
@@ -90,10 +96,18 @@ public class LogfileParser{
         });
         listener.start();
     }
+    private static String trimToMidiLogIO(String line){
+        if(!line.contains("[MidiLogIO"))return null;
+        return line.substring(line.indexOf("[MidiLogIO"));
+    }
+    private static boolean isInitLine(String line){
+        String trimmed = trimToMidiLogIO(line);
+        return trimmed!=null&&trimmed.matches(INIT_PATTERN);
+    }
     private void parseInit(String line){
-        if(!line.contains("[MidiLogIO"))return;
-        line = line.substring(line.indexOf("[MidiLogIO"));
-        if(line.matches("\\[MidiLogIO\\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\] INIT - .*")){
+        line = trimToMidiLogIO(line);
+        if(line==null)return;
+        if(line.matches(INIT_PATTERN)){
             String uid = line.substring(11, 36+11);
             String[] capabilities = line.split("\t");
             String definition = capabilities[0].split(" ", 4)[3];
